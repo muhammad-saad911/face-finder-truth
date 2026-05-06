@@ -9,6 +9,7 @@ import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
+import { Gallery } from "@/components/Gallery";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 50;
