@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
+import { Hero } from "@/components/Hero";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 50;
@@ -114,14 +115,16 @@ const Index = () => {
   const toneBar = meta?.tone === "success" ? "bg-success" : meta?.tone === "warning" ? "bg-warning" : "bg-danger";
 
   return (
-    <main className="min-h-screen px-4 md:px-8 py-10 md:py-16">
-      <div className="max-w-7xl mx-auto space-y-10">
+    <main className="min-h-screen">
+      <Hero onDetectClick={() => document.getElementById("detect")?.scrollIntoView({ behavior: "smooth" })} />
+
+      <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 space-y-10 scroll-mt-8">
         {/* Header */}
         <header className="space-y-3 max-w-3xl">
           <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// Forensic media analysis</div>
-          <h1 className="text-5xl md:text-6xl font-serif italic leading-[1.05]">
+          <h2 className="text-5xl md:text-6xl font-serif italic leading-[1.05]">
             Run a real forensic scan.
-          </h1>
+          </h2>
           <p className="text-base text-muted-foreground max-w-xl leading-relaxed">
             Upload an image or short video. Analysis runs through a multimodal AI pipeline — typically under 5 seconds.
           </p>
