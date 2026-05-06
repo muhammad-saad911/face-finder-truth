@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { Hero } from "@/components/Hero";
+import { Method } from "@/components/Method";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 50;
