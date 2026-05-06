@@ -118,6 +118,7 @@ const Index = () => {
   return (
     <main className="min-h-screen">
       <Hero onDetectClick={() => document.getElementById("detect")?.scrollIntoView({ behavior: "smooth" })} />
+      <Method />
 
       <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 space-y-10 scroll-mt-8">
         {/* Header */}
