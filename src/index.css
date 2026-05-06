@@ -80,7 +80,6 @@
     font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
 }
-}
 
 @layer utilities {
   .gradient-primary { background: var(--gradient-primary); }
