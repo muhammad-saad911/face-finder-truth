@@ -2,7 +2,14 @@ import { ArrowDown, Shield } from "lucide-react";
 import heroPixel from "@/assets/hero-pixel-face.jpg";
 import heroEyes from "@/assets/hero-eyes.jpg";
 
-export function Hero({ onDetectClick }: { onDetectClick: () => void }) {
+const navLinks = [
+  { href: "#detect", label: "Detect" },
+  { href: "#about", label: "About" },
+  { href: "#method", label: "Method" },
+  { href: "#gallery", label: "Gallery" },
+];
+
+export function Hero() {
   return (
     <section className="relative w-full">
       {/* Nav */}
