@@ -297,6 +297,10 @@ const Index = () => {
           // Files processed in-memory · Never stored · AI detection is probabilistic
         </footer>
       </div>
+
+      <Methods />
+      <Method />
+      <Gallery />
     </main>
   );
 };
