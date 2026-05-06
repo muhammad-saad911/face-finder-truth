@@ -9,6 +9,7 @@ import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
+import { Gallery } from "@/components/Gallery";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 50;
@@ -117,15 +118,13 @@ const Index = () => {
   const toneBar = meta?.tone === "success" ? "bg-success" : meta?.tone === "warning" ? "bg-warning" : "bg-danger";
 
   return (
-    <main className="min-h-screen">
-      <Hero onDetectClick={() => document.getElementById("detect")?.scrollIntoView({ behavior: "smooth" })} />
-      <Method />
-      <Methods />
+    <main className="min-h-screen [&_section]:scroll-mt-20 [&>div]:scroll-mt-20">
+      <Hero />
 
-      <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 space-y-10 scroll-mt-8">
+      <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 md:py-24 space-y-10">
         {/* Header */}
         <header className="space-y-3 max-w-3xl">
-          <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// Forensic media analysis</div>
+          <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// 01 — Forensic media analysis</div>
           <h2 className="text-5xl md:text-6xl font-serif italic leading-[1.05]">
             Run a real forensic scan.
           </h2>
@@ -298,6 +297,10 @@ const Index = () => {
           // Files processed in-memory · Never stored · AI detection is probabilistic
         </footer>
       </div>
+
+      <Methods />
+      <Method />
+      <Gallery />
     </main>
   );
 };

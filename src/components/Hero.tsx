@@ -2,7 +2,14 @@ import { ArrowDown, Shield } from "lucide-react";
 import heroPixel from "@/assets/hero-pixel-face.jpg";
 import heroEyes from "@/assets/hero-eyes.jpg";
 
-export function Hero({ onDetectClick }: { onDetectClick: () => void }) {
+const navLinks = [
+  { href: "#detect", label: "Detect" },
+  { href: "#about", label: "About" },
+  { href: "#method", label: "Method" },
+  { href: "#gallery", label: "Gallery" },
+];
+
+export function Hero() {
   return (
     <section className="relative w-full">
       {/* Nav */}
@@ -12,10 +19,9 @@ export function Hero({ onDetectClick }: { onDetectClick: () => void }) {
           <span className="font-serif text-lg tracking-tight">NeuroVeil<span className="text-primary">.</span></span>
         </div>
         <div className="hidden md:flex items-center gap-10 text-sm text-foreground/70">
-          <button onClick={onDetectClick} className="hover:text-foreground transition-colors">Detect</button>
-          <a href="#about" className="hover:text-foreground transition-colors">About</a>
-          <a href="#method" className="hover:text-foreground transition-colors">Method</a>
-          <a href="#gallery" className="hover:text-foreground transition-colors">Gallery</a>
+          {navLinks.map((l) => (
+            <a key={l.href} href={l.href} className="hover:text-foreground transition-colors">{l.label}</a>
+          ))}
         </div>
         <div className="px-4 py-1.5 rounded-full border border-border text-xs font-mono-mini tracking-widest text-foreground/80">
           555-VERIFY
@@ -36,13 +42,13 @@ export function Hero({ onDetectClick }: { onDetectClick: () => void }) {
             Veil<span className="text-primary">.</span>
           </h1>
 
-          <button
-            onClick={onDetectClick}
+          <a
+            href="#detect"
             aria-label="Scroll to detector"
-            className="w-12 h-12 rounded-full border border-foreground/30 flex items-center justify-center hover:border-primary hover:text-primary transition-colors"
+            className="inline-flex w-12 h-12 rounded-full border border-foreground/30 items-center justify-center hover:border-primary hover:text-primary transition-colors"
           >
             <ArrowDown className="w-4 h-4" />
-          </button>
+          </a>
         </div>
 
         {/* Right: image diptych */}
