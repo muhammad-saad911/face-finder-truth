@@ -42,13 +42,13 @@ export function Hero() {
             Veil<span className="text-primary">.</span>
           </h1>
 
-          <button
-            onClick={onDetectClick}
+          <a
+            href="#detect"
             aria-label="Scroll to detector"
-            className="w-12 h-12 rounded-full border border-foreground/30 flex items-center justify-center hover:border-primary hover:text-primary transition-colors"
+            className="inline-flex w-12 h-12 rounded-full border border-foreground/30 items-center justify-center hover:border-primary hover:text-primary transition-colors"
           >
             <ArrowDown className="w-4 h-4" />
-          </button>
+          </a>
         </div>
 
         {/* Right: image diptych */}
