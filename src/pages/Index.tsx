@@ -8,6 +8,7 @@ import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
+import { Methods } from "@/components/Methods";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 50;
@@ -119,6 +120,7 @@ const Index = () => {
     <main className="min-h-screen">
       <Hero onDetectClick={() => document.getElementById("detect")?.scrollIntoView({ behavior: "smooth" })} />
       <Method />
+      <Methods />
 
       <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 space-y-10 scroll-mt-8">
         {/* Header */}
