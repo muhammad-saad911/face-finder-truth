@@ -3,9 +3,9 @@ import { Upload, Image as ImageIcon, Film, X, Loader2, ShieldCheck, Sparkles, Sh
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
+import { aggregate, classifyImage, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
