@@ -28,7 +28,8 @@ const Index = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [tab, setTab] = useState<"image" | "video">("image");
-  const [status, setStatus] = useState<"idle" | "preparing" | "analyzing">("idle");
+  const [status, setStatus] = useState<"idle" | "loading-model" | "preparing" | "analyzing">("idle");
+  const [modelProgress, setModelProgress] = useState<number>(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
