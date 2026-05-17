@@ -3,9 +3,9 @@ import { Upload, Image as ImageIcon, Film, X, Loader2, ShieldCheck, Sparkles, Sh
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
+import { aggregate, classifyImage, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
@@ -28,7 +28,8 @@ const Index = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [tab, setTab] = useState<"image" | "video">("image");
-  const [status, setStatus] = useState<"idle" | "preparing" | "analyzing">("idle");
+  const [status, setStatus] = useState<"idle" | "loading-model" | "preparing" | "analyzing">("idle");
+  const [modelProgress, setModelProgress] = useState<number>(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,32 +78,34 @@ const Index = () => {
     if (!file) return;
     setResult(null);
     try {
+      // 1) Make sure the in-browser model is loaded
+      setStatus("loading-model");
+      setModelProgress(0);
+      await loadDetector((p) => {
+        if (p.status === "progress" && typeof p.progress === "number") {
+          setModelProgress(Math.round(p.progress));
+        }
+      });
+
+      // 2) Prepare frames
       setStatus("preparing");
       let images: string[];
       if (mediaType === "image") {
         const dataUrl = await fileToDataUrl(file);
-        images = [await compressImage(dataUrl, 1024, 0.85)];
+        images = [await compressImage(dataUrl, 1024, 0.9)];
       } else {
         toast.info("Extracting video frames...");
         images = await extractVideoFrames(file, 5, 1024);
       }
 
+      // 3) Run the ONNX detector on every frame, locally
       setStatus("analyzing");
-      const { data, error } = await supabase.functions.invoke("detect-deepfake", {
-        body: { images, mediaType },
-      });
-
-      if (error) {
-        const msg = (error as any).context?.status === 429
-          ? "Rate limit reached. Try again in a moment."
-          : (error as any).context?.status === 402
-          ? "AI credits exhausted. Add credits in workspace settings."
-          : error.message || "Analysis failed";
-        throw new Error(msg);
+      const scores = [];
+      for (const img of images) {
+        scores.push(await classifyImage(img));
       }
-      if (data?.error) throw new Error(data.error);
-
-      setResult(data as AnalysisResult);
+      const result = aggregate(scores);
+      setResult(result as AnalysisResult);
       toast.success("Scan complete");
     } catch (e) {
       console.error(e);
@@ -221,7 +224,11 @@ const Index = () => {
             >
               {isWorking ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {status === "preparing" ? (mediaType === "video" ? "Extracting frames..." : "Preparing...") : "Analyzing..."}
+                  {status === "loading-model"
+                    ? `Loading detector${modelProgress ? ` ${modelProgress}%` : "…"}`
+                    : status === "preparing"
+                    ? (mediaType === "video" ? "Extracting frames..." : "Preparing...")
+                    : "Analyzing..."}
                 </>
               ) : (
                 <><Sparkles className="w-4 h-4 mr-2" /> Analyze</>
