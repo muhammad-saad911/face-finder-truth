@@ -78,32 +78,34 @@ const Index = () => {
     if (!file) return;
     setResult(null);
     try {
+      // 1) Make sure the in-browser model is loaded
+      setStatus("loading-model");
+      setModelProgress(0);
+      await loadDetector((p) => {
+        if (p.status === "progress" && typeof p.progress === "number") {
+          setModelProgress(Math.round(p.progress));
+        }
+      });
+
+      // 2) Prepare frames
       setStatus("preparing");
       let images: string[];
       if (mediaType === "image") {
         const dataUrl = await fileToDataUrl(file);
-        images = [await compressImage(dataUrl, 1024, 0.85)];
+        images = [await compressImage(dataUrl, 1024, 0.9)];
       } else {
         toast.info("Extracting video frames...");
         images = await extractVideoFrames(file, 5, 1024);
       }
 
+      // 3) Run the ONNX detector on every frame, locally
       setStatus("analyzing");
-      const { data, error } = await supabase.functions.invoke("detect-deepfake", {
-        body: { images, mediaType },
-      });
-
-      if (error) {
-        const msg = (error as any).context?.status === 429
-          ? "Rate limit reached. Try again in a moment."
-          : (error as any).context?.status === 402
-          ? "AI credits exhausted. Add credits in workspace settings."
-          : error.message || "Analysis failed";
-        throw new Error(msg);
+      const scores = [];
+      for (const img of images) {
+        scores.push(await classifyImage(img));
       }
-      if (data?.error) throw new Error(data.error);
-
-      setResult(data as AnalysisResult);
+      const result = aggregate(scores);
+      setResult(result as AnalysisResult);
       toast.success("Scan complete");
     } catch (e) {
       console.error(e);
