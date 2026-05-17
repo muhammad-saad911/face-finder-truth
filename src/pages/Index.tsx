@@ -224,7 +224,11 @@ const Index = () => {
             >
               {isWorking ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {status === "preparing" ? (mediaType === "video" ? "Extracting frames..." : "Preparing...") : "Analyzing..."}
+                  {status === "loading-model"
+                    ? `Loading detector${modelProgress ? ` ${modelProgress}%` : "…"}`
+                    : status === "preparing"
+                    ? (mediaType === "video" ? "Extracting frames..." : "Preparing...")
+                    : "Analyzing..."}
                 </>
               ) : (
                 <><Sparkles className="w-4 h-4 mr-2" /> Analyze</>
