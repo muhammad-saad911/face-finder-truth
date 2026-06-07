@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { aggregate, classifyImage, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
+import { classifyAudio, extractAudioPcm, loadAudioDetector } from "@/lib/audioDeepfakeDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
