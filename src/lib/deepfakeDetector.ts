@@ -73,13 +73,23 @@ export type AggregatedResult = {
   perFrame?: FrameScore[];
 };
 
-export function aggregate(scores: FrameScore[]): AggregatedResult {
+export type AudioFusion = {
+  fakeProbability: number; // 0..1
+  raw: Array<{ label: string; score: number }>;
+};
+
+export function aggregate(scores: FrameScore[], audio?: AudioFusion | null): AggregatedResult {
   const avgFake = scores.reduce((a, s) => a + s.fakeProbability, 0) / scores.length;
   const variance =
     scores.reduce((a, s) => a + (s.fakeProbability - avgFake) ** 2, 0) / scores.length;
   const stdev = Math.sqrt(variance);
 
-  const pct = avgFake * 100;
+  // Fuse visual + audio: weighted average (visual 0.65, audio 0.35).
+  const fused = audio
+    ? avgFake * 0.65 + audio.fakeProbability * 0.35
+    : avgFake;
+
+  const pct = fused * 100;
   let verdict: AggregatedResult["verdict"];
   if (pct >= 85) verdict = "deepfake";
   else if (pct >= 60) verdict = "likely_deepfake";
@@ -87,30 +97,44 @@ export function aggregate(scores: FrameScore[]): AggregatedResult {
   else if (pct >= 20) verdict = "likely_authentic";
   else verdict = "authentic";
 
-  // Confidence: high when avg is near 0 or 100, and frames agree (low stdev)
-  const decisiveness = Math.abs(avgFake - 0.5) * 2; // 0..1
+  const decisiveness = Math.abs(fused - 0.5) * 2;
   const agreement = scores.length > 1 ? Math.max(0, 1 - stdev * 2) : 1;
-  const confidence = Math.round((decisiveness * 0.7 + agreement * 0.3) * 100);
+  // Audio that agrees with visual boosts confidence; disagreement lowers it.
+  const av = audio ? 1 - Math.abs(avgFake - audio.fakeProbability) : 1;
+  const confidence = Math.round((decisiveness * 0.6 + agreement * 0.25 + av * 0.15) * 100);
+
+  const visualPct = avgFake * 100;
+  const audioPct = audio ? audio.fakeProbability * 100 : null;
 
   const summary =
     verdict === "deepfake" || verdict === "likely_deepfake"
-      ? `Xception-class ONNX detector flagged synthetic-image patterns with ${pct.toFixed(0)}% probability.`
+      ? audio
+        ? `Visual + audio detectors flagged synthetic patterns (fused ${pct.toFixed(0)}%, visual ${visualPct.toFixed(0)}%, audio ${audioPct!.toFixed(0)}%).`
+        : `Xception-class ONNX detector flagged synthetic-image patterns with ${pct.toFixed(0)}% probability.`
       : verdict === "uncertain"
       ? `Detector returned an inconclusive ${pct.toFixed(0)}% deepfake signal — features sit close to the decision boundary.`
+      : audio
+      ? `No strong synthetic artifacts in video frames or audio (fused ${pct.toFixed(0)}%).`
       : `Detector found no strong synthetic-image artifacts (${pct.toFixed(0)}% deepfake probability).`;
 
   const observations: string[] = [
-    `Model: onnx-community/Deep-Fake-Detector-v2 (in-browser ONNX, no server call)`,
+    `Visual model: onnx-community/Deep-Fake-Detector-v2 (in-browser ONNX)`,
     `Frames analyzed: ${scores.length}`,
-    `Average fake probability: ${pct.toFixed(1)}%`,
+    `Visual fake probability: ${visualPct.toFixed(1)}%`,
   ];
   if (scores.length > 1) {
     const min = Math.min(...scores.map((s) => s.fakeProbability)) * 100;
     const max = Math.max(...scores.map((s) => s.fakeProbability)) * 100;
     observations.push(`Per-frame range: ${min.toFixed(1)}% – ${max.toFixed(1)}% (stdev ${(stdev * 100).toFixed(1)})`);
   }
+  if (audio && audioPct !== null) {
+    observations.push(`Audio model: wav2vec2-xlsr deepfake (in-browser ONNX, INT8)`);
+    observations.push(`Audio fake probability: ${audioPct.toFixed(1)}%`);
+    const topA = audio.raw.slice(0, 2).map((r) => `${r.label} ${(r.score * 100).toFixed(0)}%`).join(", ");
+    if (topA) observations.push(`Top audio labels: ${topA}`);
+  }
   const top = scores[0]?.raw?.slice(0, 2).map((r) => `${r.label} ${(r.score * 100).toFixed(0)}%`).join(", ");
-  if (top) observations.push(`Top labels (frame 1): ${top}`);
+  if (top) observations.push(`Top visual labels (frame 1): ${top}`);
 
   return {
     verdict,
