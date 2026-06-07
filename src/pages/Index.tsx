@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { aggregate, classifyImage, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
+import { classifyAudio, extractAudioPcm, loadAudioDetector } from "@/lib/audioDeepfakeDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
@@ -104,7 +105,27 @@ const Index = () => {
       for (const img of images) {
         scores.push(await classifyImage(img));
       }
-      const result = aggregate(scores);
+
+      // 4) For videos, also run the audio deepfake detector if there's an audio track
+      let audioVerdict = null;
+      if (mediaType === "video") {
+        try {
+          const pcm = await extractAudioPcm(file);
+          if (pcm && pcm.length > 16000 * 0.5) {
+            toast.info("Analyzing audio track...");
+            await loadAudioDetector((p) => {
+              if (p.status === "progress" && typeof p.progress === "number") {
+                setModelProgress(Math.round(p.progress));
+              }
+            });
+            audioVerdict = await classifyAudio(pcm);
+          }
+        } catch (e) {
+          console.warn("Audio analysis skipped:", e);
+        }
+      }
+
+      const result = aggregate(scores, audioVerdict);
       setResult(result as AnalysisResult);
       toast.success("Scan complete");
     } catch (e) {
