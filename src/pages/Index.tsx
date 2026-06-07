@@ -12,7 +12,7 @@ import { Methods } from "@/components/Methods";
 import { Gallery } from "@/components/Gallery";
 
 const MAX_IMAGE_MB = 15;
-const MAX_VIDEO_MB = 50;
+const MAX_VIDEO_MB = 100;
 const ACCEPTED_IMAGE = ["image/jpeg", "image/png", "image/webp"];
 const ACCEPTED_VIDEO = ["video/mp4", "video/quicktime", "video/webm"];
 
