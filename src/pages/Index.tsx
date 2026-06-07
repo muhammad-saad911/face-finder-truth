@@ -7,6 +7,7 @@ import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { aggregate, classifyImage, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
 import { classifyAudio, extractAudioPcm, loadAudioDetector } from "@/lib/audioDeepfakeDetector";
+import { cropFace, loadFaceDetector } from "@/lib/faceDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
@@ -96,7 +97,20 @@ const Index = () => {
         images = [await compressImage(dataUrl, 1024, 0.9)];
       } else {
         toast.info("Extracting video frames...");
-        images = await extractVideoFrames(file, 5, 1024);
+        images = await extractVideoFrames(file, 15, 1024);
+      }
+
+      // 2b) Face-crop each frame (BlazeFace, ~1MB) — improves accuracy by
+      // focusing the deepfake classifier on the face region.
+      try {
+        await loadFaceDetector();
+        const cropped: string[] = [];
+        for (const img of images) {
+          cropped.push(await cropFace(img));
+        }
+        images = cropped;
+      } catch (e) {
+        console.warn("Face cropping skipped:", e);
       }
 
       // 3) Run the ONNX detector on every frame, locally
