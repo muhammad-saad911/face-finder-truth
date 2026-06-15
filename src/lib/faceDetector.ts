@@ -83,6 +83,67 @@ export async function cropFace(
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
+/**
+ * Returns ALL detected faces as cropped data URLs (largest first).
+ * Useful for still images where multiple subjects may appear.
+ * Returns [originalImage] when no faces are detected.
+ */
+export async function cropAllFaces(
+  imageDataUrl: string,
+  pad = 0.4,
+  outSize = 384,
+  maxFaces = 4,
+): Promise<string[]> {
+  const img = await loadImage(imageDataUrl);
+  let model: blazeface.BlazeFaceModel;
+  try {
+    model = await loadFaceDetector();
+  } catch {
+    return [imageDataUrl];
+  }
+  const predictions = await model.estimateFaces(img, false);
+  if (!predictions || predictions.length === 0) return [imageDataUrl];
+
+  const sorted = [...predictions].sort((a, b) => {
+    const [ax1, ay1] = a.topLeft as [number, number];
+    const [ax2, ay2] = a.bottomRight as [number, number];
+    const [bx1, by1] = b.topLeft as [number, number];
+    const [bx2, by2] = b.bottomRight as [number, number];
+    return (bx2 - bx1) * (by2 - by1) - (ax2 - ax1) * (ay2 - ay1);
+  });
+
+  const crops: string[] = [];
+  for (const p of sorted.slice(0, maxFaces)) {
+    const [x1, y1] = p.topLeft as [number, number];
+    const [x2, y2] = p.bottomRight as [number, number];
+    const w = x2 - x1;
+    const h = y2 - y1;
+    if (w < 24 || h < 24) continue; // skip tiny detections
+    const px = w * pad;
+    const py = h * pad;
+    const cx1 = Math.max(0, Math.floor(x1 - px));
+    const cy1 = Math.max(0, Math.floor(y1 - py));
+    const cx2 = Math.min(img.width, Math.ceil(x2 + px));
+    const cy2 = Math.min(img.height, Math.ceil(y2 + py));
+    const cw = cx2 - cx1;
+    const ch = cy2 - cy1;
+    const canvas = document.createElement("canvas");
+    canvas.width = outSize;
+    canvas.height = outSize;
+    const ctx = canvas.getContext("2d")!;
+    const scale = Math.min(outSize / cw, outSize / ch);
+    const dw = Math.round(cw * scale);
+    const dh = Math.round(ch * scale);
+    const dx = Math.round((outSize - dw) / 2);
+    const dy = Math.round((outSize - dh) / 2);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, outSize, outSize);
+    ctx.drawImage(img, cx1, cy1, cw, ch, dx, dy, dw, dh);
+    crops.push(canvas.toDataURL("image/jpeg", 0.92));
+  }
+  return crops.length ? crops : [imageDataUrl];
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
