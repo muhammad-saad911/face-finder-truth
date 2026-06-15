@@ -64,6 +64,58 @@ export async function classifyImage(imageSrc: string): Promise<FrameScore> {
   return { fakeProbability: fake / total, realProbability: real / total, raw: output };
 }
 
+/**
+ * Test-Time Augmentation: classifies the image, a horizontal flip, and a
+ * center-zoom (90%) crop, then averages the probabilities. Costs ~3x compute
+ * but typically improves accuracy by 2-5% and reduces false positives on
+ * borderline images. Use this for single-image analysis (not video frames).
+ */
+export async function classifyImageTTA(imageSrc: string): Promise<FrameScore> {
+  const variants = await Promise.all([
+    Promise.resolve(imageSrc),
+    transformImage(imageSrc, "flip"),
+    transformImage(imageSrc, "zoom"),
+  ]);
+  const results = await Promise.all(variants.map((v) => classifyImage(v)));
+  const fake = results.reduce((a, r) => a + r.fakeProbability, 0) / results.length;
+  const real = results.reduce((a, r) => a + r.realProbability, 0) / results.length;
+  // Merge raw labels: sum scores per label, then re-normalize
+  const merged = new Map<string, number>();
+  for (const r of results) {
+    for (const e of r.raw) merged.set(e.label, (merged.get(e.label) ?? 0) + e.score / results.length);
+  }
+  const raw = Array.from(merged.entries())
+    .map(([label, score]) => ({ label, score }))
+    .sort((a, b) => b.score - a.score);
+  return { fakeProbability: fake, realProbability: real, raw };
+}
+
+async function transformImage(src: string, mode: "flip" | "zoom"): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = src;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d")!;
+  if (mode === "flip") {
+    ctx.translate(img.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+  } else {
+    // center-zoom: take the inner 90% region and stretch back to full size
+    const cw = img.width * 0.9;
+    const ch = img.height * 0.9;
+    const sx = (img.width - cw) / 2;
+    const sy = (img.height - ch) / 2;
+    ctx.drawImage(img, sx, sy, cw, ch, 0, 0, img.width, img.height);
+  }
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 export type AggregatedResult = {
   verdict: "authentic" | "likely_authentic" | "uncertain" | "likely_deepfake" | "deepfake";
   deepfake_probability: number; // 0..100
