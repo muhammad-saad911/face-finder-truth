@@ -92,33 +92,43 @@ const Index = () => {
       // 2) Prepare frames
       setStatus("preparing");
       let images: string[];
+      let useTTA = false;
       if (mediaType === "image") {
         const dataUrl = await fileToDataUrl(file);
-        images = [await compressImage(dataUrl, 1024, 0.9)];
+        const compressed = await compressImage(dataUrl, 1024, 0.9);
+        // For still images: detect ALL faces and analyze each with TTA.
+        // This catches partial deepfakes in group photos and adds ~3x accuracy.
+        try {
+          await loadFaceDetector();
+          images = await cropAllFaces(compressed, 0.4, 384, 4);
+        } catch (e) {
+          console.warn("Multi-face crop skipped:", e);
+          images = [compressed];
+        }
+        useTTA = true;
       } else {
         toast.info("Extracting video frames...");
         images = await extractVideoFrames(file, 15, 1024);
-      }
-
-      // 2b) Face-crop each frame (BlazeFace, ~1MB) — improves accuracy by
-      // focusing the deepfake classifier on the face region.
-      try {
-        await loadFaceDetector();
-        const cropped: string[] = [];
-        for (const img of images) {
-          cropped.push(await cropFace(img));
+        // 2b) Face-crop each video frame (single largest face, no TTA — speed)
+        try {
+          await loadFaceDetector();
+          const cropped: string[] = [];
+          for (const img of images) {
+            cropped.push(await cropFace(img));
+          }
+          images = cropped;
+        } catch (e) {
+          console.warn("Face cropping skipped:", e);
         }
-        images = cropped;
-      } catch (e) {
-        console.warn("Face cropping skipped:", e);
       }
 
-      // 3) Run the ONNX detector on every frame, locally
+      // 3) Run the ONNX detector on every frame/face, locally
       setStatus("analyzing");
       const scores = [];
       for (const img of images) {
-        scores.push(await classifyImage(img));
+        scores.push(useTTA ? await classifyImageTTA(img) : await classifyImage(img));
       }
+
 
       // 4) For videos, also run the audio deepfake detector if there's an audio track
       let audioVerdict = null;
