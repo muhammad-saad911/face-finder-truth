@@ -96,13 +96,14 @@ const Index = () => {
       if (mediaType === "image") {
         const dataUrl = await fileToDataUrl(file);
         const compressed = await compressImage(dataUrl, 1024, 0.9);
-        // For still images: detect ALL faces and analyze each with TTA.
-        // This catches partial deepfakes in group photos and adds ~3x accuracy.
+        // For still images: detect ALL faces and emit multi-scale crops
+        // (tight/medium/wide pad) per face + sliding-window tiles for context.
+        // Each crop is then run through TTA for max accuracy on partial edits.
         try {
           await loadFaceDetector();
-          images = await cropAllFaces(compressed, 0.4, 384, 4);
+          images = await cropFacesMultiScale(compressed, [0.15, 0.4, 0.8], 384, 3);
         } catch (e) {
-          console.warn("Multi-face crop skipped:", e);
+          console.warn("Multi-scale crop skipped:", e);
           images = [compressed];
         }
         useTTA = true;
