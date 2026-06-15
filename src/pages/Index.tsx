@@ -7,7 +7,7 @@ import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
 import { aggregate, classifyImage, classifyImageTTA, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
 import { classifyAudio, extractAudioPcm, loadAudioDetector } from "@/lib/audioDeepfakeDetector";
-import { cropAllFaces, cropFace, loadFaceDetector } from "@/lib/faceDetector";
+import { cropFace, cropFacesMultiScale, loadFaceDetector } from "@/lib/faceDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
