@@ -197,14 +197,17 @@ export async function cropFacesMultiScale(
     }
   }
 
-  // Sliding-window tiles over the full image (catches non-face edits / no face).
-  const tiles = sortedTiles(img.width, img.height);
-  // If no faces, take 3 tiles (center + 2 halves). If faces, just add center tile.
-  const tileCount = predictions.length === 0 ? Math.min(3, tiles.length) : 1;
-  for (let i = 0; i < tileCount; i++) {
-    const [tx, ty, tw, th] = tiles[i];
-    out.push(letterbox(img, tx, ty, tw, th, outSize));
+  // Sliding-window tiles over the full image — ONLY when no face was found.
+  // When faces are present, extra tiles tend to spuriously flag real photos
+  // because the deepfake model is trained on faces, not arbitrary scenery.
+  if (predictions.length === 0) {
+    const tiles = sortedTiles(img.width, img.height);
+    for (let i = 0; i < Math.min(3, tiles.length); i++) {
+      const [tx, ty, tw, th] = tiles[i];
+      out.push(letterbox(img, tx, ty, tw, th, outSize));
+    }
   }
+
 
   return out.length ? out : [imageDataUrl];
 }

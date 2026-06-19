@@ -132,10 +132,10 @@ export type AudioFusion = {
 
 /**
  * Aggregates per-crop / per-frame scores.
- * `mode = "topk"` (default for stills) keeps the top-K most-fake crops and
- * averages them — deepfake artifacts are LOCAL, so a strong signal in one
- * face/region must not be diluted by neutral context tiles.
- * `mode = "mean"` is for videos where every frame should agree.
+ * `mode = "topk"` (stills) uses a 60/40 blend of mean + top-K-mean. This
+ * preserves the local-signal sensitivity of max-pool while preventing a
+ * single noisy crop from dragging a real photo into the fake bucket.
+ * `mode = "mean"` (videos) — every frame should agree.
  */
 export function aggregate(
   scores: FrameScore[],
@@ -143,11 +143,12 @@ export function aggregate(
   mode: "mean" | "topk" = "mean",
 ): AggregatedResult {
   const sorted = [...scores].sort((a, b) => b.fakeProbability - a.fakeProbability);
-  const k = mode === "topk" ? Math.max(1, Math.ceil(scores.length / 3)) : scores.length;
-  const pooled = sorted.slice(0, k);
-  const avgFake = pooled.reduce((a, s) => a + s.fakeProbability, 0) / pooled.length;
+  const meanFake = scores.reduce((a, s) => a + s.fakeProbability, 0) / scores.length;
+  const k = Math.max(1, Math.ceil(scores.length / 3));
+  const topkMean = sorted.slice(0, k).reduce((a, s) => a + s.fakeProbability, 0) / k;
+  const avgFake = mode === "topk" ? meanFake * 0.6 + topkMean * 0.4 : meanFake;
   const variance =
-    scores.reduce((a, s) => a + (s.fakeProbability - avgFake) ** 2, 0) / scores.length;
+    scores.reduce((a, s) => a + (s.fakeProbability - meanFake) ** 2, 0) / scores.length;
   const stdev = Math.sqrt(variance);
   const maxFake = sorted[0]?.fakeProbability ?? 0;
 
@@ -159,11 +160,13 @@ export function aggregate(
 
   const pct = fused * 100;
   let verdict: AggregatedResult["verdict"];
-  if (pct >= 85) verdict = "deepfake";
-  else if (pct >= 60) verdict = "likely_deepfake";
-  else if (pct >= 40) verdict = "uncertain";
-  else if (pct >= 20) verdict = "likely_authentic";
+  // Recalibrated to reduce false positives on real photos.
+  if (pct >= 88) verdict = "deepfake";
+  else if (pct >= 70) verdict = "likely_deepfake";
+  else if (pct >= 50) verdict = "uncertain";
+  else if (pct >= 30) verdict = "likely_authentic";
   else verdict = "authentic";
+
 
   const decisiveness = Math.abs(fused - 0.5) * 2;
   const agreement = scores.length > 1 ? Math.max(0, 1 - stdev * 2) : 1;
