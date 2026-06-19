@@ -113,7 +113,7 @@ async function transformImage(src: string, mode: "flip" | "zoom"): Promise<strin
     const sy = (img.height - ch) / 2;
     ctx.drawImage(img, sx, sy, cw, ch, 0, 0, img.width, img.height);
   }
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return canvas.toDataURL("image/png");
 }
 
 export type AggregatedResult = {
