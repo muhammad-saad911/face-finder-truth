@@ -152,7 +152,7 @@ const Index = () => {
         }
       }
 
-      const result = aggregate(scores, audioVerdict);
+      const result = aggregate(scores, audioVerdict, mediaType === "image" ? "topk" : "mean");
       setResult(result as AnalysisResult);
       toast.success("Scan complete");
     } catch (e) {
