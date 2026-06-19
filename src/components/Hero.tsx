@@ -37,9 +37,9 @@ export function Hero() {
             <span className="font-serif italic text-sm">Welcome to</span>
           </div>
 
-          <h1 className="font-serif text-[18vw] lg:text-[10rem] leading-[0.9] tracking-tight">
-            Neuro<br />
-            Veil<span className="text-primary">.</span>
+          <h1 className="font-serif text-[14vw] lg:text-[8rem] leading-[0.9] tracking-tight">
+            Deep Fake<br />
+            Detection System<span className="text-primary">.</span>
           </h1>
 
           <a
