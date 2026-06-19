@@ -113,7 +113,7 @@ async function transformImage(src: string, mode: "flip" | "zoom"): Promise<strin
     const sy = (img.height - ch) / 2;
     ctx.drawImage(img, sx, sy, cw, ch, 0, 0, img.width, img.height);
   }
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return canvas.toDataURL("image/png");
 }
 
 export type AggregatedResult = {
@@ -130,16 +130,32 @@ export type AudioFusion = {
   raw: Array<{ label: string; score: number }>;
 };
 
-export function aggregate(scores: FrameScore[], audio?: AudioFusion | null): AggregatedResult {
-  const avgFake = scores.reduce((a, s) => a + s.fakeProbability, 0) / scores.length;
+/**
+ * Aggregates per-crop / per-frame scores.
+ * `mode = "topk"` (default for stills) keeps the top-K most-fake crops and
+ * averages them — deepfake artifacts are LOCAL, so a strong signal in one
+ * face/region must not be diluted by neutral context tiles.
+ * `mode = "mean"` is for videos where every frame should agree.
+ */
+export function aggregate(
+  scores: FrameScore[],
+  audio?: AudioFusion | null,
+  mode: "mean" | "topk" = "mean",
+): AggregatedResult {
+  const sorted = [...scores].sort((a, b) => b.fakeProbability - a.fakeProbability);
+  const k = mode === "topk" ? Math.max(1, Math.ceil(scores.length / 3)) : scores.length;
+  const pooled = sorted.slice(0, k);
+  const avgFake = pooled.reduce((a, s) => a + s.fakeProbability, 0) / pooled.length;
   const variance =
     scores.reduce((a, s) => a + (s.fakeProbability - avgFake) ** 2, 0) / scores.length;
   const stdev = Math.sqrt(variance);
+  const maxFake = sorted[0]?.fakeProbability ?? 0;
 
   // Fuse visual + audio: weighted average (visual 0.65, audio 0.35).
   const fused = audio
     ? avgFake * 0.65 + audio.fakeProbability * 0.35
     : avgFake;
+
 
   const pct = fused * 100;
   let verdict: AggregatedResult["verdict"];
@@ -176,8 +192,9 @@ export function aggregate(scores: FrameScore[], audio?: AudioFusion | null): Agg
   ];
   if (scores.length > 1) {
     const min = Math.min(...scores.map((s) => s.fakeProbability)) * 100;
-    const max = Math.max(...scores.map((s) => s.fakeProbability)) * 100;
-    observations.push(`Per-frame range: ${min.toFixed(1)}% – ${max.toFixed(1)}% (stdev ${(stdev * 100).toFixed(1)})`);
+    const max = maxFake * 100;
+    observations.push(`Per-crop range: ${min.toFixed(1)}% – ${max.toFixed(1)}% (stdev ${(stdev * 100).toFixed(1)})`);
+    if (mode === "topk") observations.push(`Top-${k} pool of ${scores.length} crops (local-signal aware)`);
   }
   if (audio && audioPct !== null) {
     observations.push(`Audio model: wav2vec2-xlsr deepfake (in-browser ONNX, INT8)`);

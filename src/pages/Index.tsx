@@ -95,18 +95,20 @@ const Index = () => {
       let useTTA = false;
       if (mediaType === "image") {
         const dataUrl = await fileToDataUrl(file);
-        const compressed = await compressImage(dataUrl, 1024, 0.9);
+        // NOTE: do NOT re-compress the source — JPEG re-encoding destroys the
+        // exact compression artifacts the deepfake detector relies on.
         // For still images: detect ALL faces and emit multi-scale crops
         // (tight/medium/wide pad) per face + sliding-window tiles for context.
         // Each crop is then run through TTA for max accuracy on partial edits.
         try {
           await loadFaceDetector();
-          images = await cropFacesMultiScale(compressed, [0.15, 0.4, 0.8], 384, 3);
+          images = await cropFacesMultiScale(dataUrl, [0.15, 0.4, 0.8], 384, 3);
         } catch (e) {
           console.warn("Multi-scale crop skipped:", e);
-          images = [compressed];
+          images = [dataUrl];
         }
         useTTA = true;
+
       } else {
         toast.info("Extracting video frames...");
         images = await extractVideoFrames(file, 15, 1024);
@@ -150,7 +152,7 @@ const Index = () => {
         }
       }
 
-      const result = aggregate(scores, audioVerdict);
+      const result = aggregate(scores, audioVerdict, mediaType === "image" ? "topk" : "mean");
       setResult(result as AnalysisResult);
       toast.success("Scan complete");
     } catch (e) {

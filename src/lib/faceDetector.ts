@@ -79,8 +79,9 @@ export async function cropFace(
   const dy = Math.round((outSize - dh) / 2);
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, outSize, outSize);
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, cx1, cy1, cw, ch, dx, dy, dw, dh);
-  return canvas.toDataURL("image/jpeg", 0.9);
+  return canvas.toDataURL("image/png");
 }
 
 /**
@@ -138,8 +139,9 @@ export async function cropAllFaces(
     const dy = Math.round((outSize - dh) / 2);
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, outSize, outSize);
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, cx1, cy1, cw, ch, dx, dy, dw, dh);
-    crops.push(canvas.toDataURL("image/jpeg", 0.92));
+    crops.push(canvas.toDataURL("image/png"));
   }
   return crops.length ? crops : [imageDataUrl];
 }
@@ -226,8 +228,9 @@ function letterbox(
   const dy = Math.round((outSize - dh) / 2);
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, outSize, outSize);
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return canvas.toDataURL("image/png");
 }
 
 /** Center square + left/right (or top/bottom) halves as sliding tiles. */
