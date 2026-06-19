@@ -192,8 +192,9 @@ export function aggregate(
   ];
   if (scores.length > 1) {
     const min = Math.min(...scores.map((s) => s.fakeProbability)) * 100;
-    const max = Math.max(...scores.map((s) => s.fakeProbability)) * 100;
-    observations.push(`Per-frame range: ${min.toFixed(1)}% – ${max.toFixed(1)}% (stdev ${(stdev * 100).toFixed(1)})`);
+    const max = maxFake * 100;
+    observations.push(`Per-crop range: ${min.toFixed(1)}% – ${max.toFixed(1)}% (stdev ${(stdev * 100).toFixed(1)})`);
+    if (mode === "topk") observations.push(`Top-${k} pool of ${scores.length} crops (local-signal aware)`);
   }
   if (audio && audioPct !== null) {
     observations.push(`Audio model: wav2vec2-xlsr deepfake (in-browser ONNX, INT8)`);
