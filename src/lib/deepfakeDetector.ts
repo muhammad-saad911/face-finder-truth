@@ -130,16 +130,32 @@ export type AudioFusion = {
   raw: Array<{ label: string; score: number }>;
 };
 
-export function aggregate(scores: FrameScore[], audio?: AudioFusion | null): AggregatedResult {
-  const avgFake = scores.reduce((a, s) => a + s.fakeProbability, 0) / scores.length;
+/**
+ * Aggregates per-crop / per-frame scores.
+ * `mode = "topk"` (default for stills) keeps the top-K most-fake crops and
+ * averages them — deepfake artifacts are LOCAL, so a strong signal in one
+ * face/region must not be diluted by neutral context tiles.
+ * `mode = "mean"` is for videos where every frame should agree.
+ */
+export function aggregate(
+  scores: FrameScore[],
+  audio?: AudioFusion | null,
+  mode: "mean" | "topk" = "mean",
+): AggregatedResult {
+  const sorted = [...scores].sort((a, b) => b.fakeProbability - a.fakeProbability);
+  const k = mode === "topk" ? Math.max(1, Math.ceil(scores.length / 3)) : scores.length;
+  const pooled = sorted.slice(0, k);
+  const avgFake = pooled.reduce((a, s) => a + s.fakeProbability, 0) / pooled.length;
   const variance =
     scores.reduce((a, s) => a + (s.fakeProbability - avgFake) ** 2, 0) / scores.length;
   const stdev = Math.sqrt(variance);
+  const maxFake = sorted[0]?.fakeProbability ?? 0;
 
   // Fuse visual + audio: weighted average (visual 0.65, audio 0.35).
   const fused = audio
     ? avgFake * 0.65 + audio.fakeProbability * 0.35
     : avgFake;
+
 
   const pct = fused * 100;
   let verdict: AggregatedResult["verdict"];
