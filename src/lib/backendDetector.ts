@@ -32,11 +32,18 @@ function clampPercent(value: number) {
   return Math.min(100, Math.max(0, value));
 }
 
-function resolveVerdict(deepfakeProbability: number): AnalysisResult["verdict"] {
+function resolveVerdict(
+  deepfakeProbability: number,
+  confidence?: number,
+  mediaType?: BackendMediaType,
+): AnalysisResult["verdict"] {
+  if (mediaType === "video" && typeof confidence === "number" && confidence < 50 && deepfakeProbability < 75) {
+    return "uncertain";
+  }
   if (deepfakeProbability >= 88) return "deepfake";
-  if (deepfakeProbability >= 70) return "likely_deepfake";
-  if (deepfakeProbability >= 50) return "uncertain";
-  if (deepfakeProbability >= 30) return "likely_authentic";
+  if (deepfakeProbability >= 60) return "likely_deepfake";
+  if (deepfakeProbability >= 40) return "uncertain";
+  if (deepfakeProbability >= 20) return "likely_authentic";
   return "authentic";
 }
 
@@ -48,8 +55,8 @@ function buildResult(
   model = "faceforge-detector",
 ): BackendAnalysisResponse {
   const normalizedProbability = clampPercent(deepfakeProbability);
-  const verdict = resolveVerdict(normalizedProbability);
   const resultConfidence = clampPercent(confidence);
+  const verdict = resolveVerdict(normalizedProbability, resultConfidence, mediaType);
   const realProbability = clampPercent(100 - normalizedProbability);
   const observations =
     mediaType === "video"

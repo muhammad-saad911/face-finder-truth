@@ -156,23 +156,20 @@ export function aggregate(
   const fused = audio
     ? avgFake * 0.65 + audio.fakeProbability * 0.35
     : avgFake;
-
-
   const pct = fused * 100;
-  let verdict: AggregatedResult["verdict"];
-  // Recalibrated to reduce false positives on real photos.
-  if (pct >= 88) verdict = "deepfake";
-  else if (pct >= 70) verdict = "likely_deepfake";
-  else if (pct >= 50) verdict = "uncertain";
-  else if (pct >= 30) verdict = "likely_authentic";
-  else verdict = "authentic";
-
-
   const decisiveness = Math.abs(fused - 0.5) * 2;
   const agreement = scores.length > 1 ? Math.max(0, 1 - stdev * 2) : 1;
   // Audio that agrees with visual boosts confidence; disagreement lowers it.
   const av = audio ? 1 - Math.abs(avgFake - audio.fakeProbability) : 1;
   const confidence = Math.round((decisiveness * 0.6 + agreement * 0.25 + av * 0.15) * 100);
+  let verdict: AggregatedResult["verdict"];
+  // Recalibrated to reduce false positives on real videos with weak consensus.
+  if (mode === "mean" && confidence < 50 && pct < 75) verdict = "uncertain";
+  else if (pct >= 88) verdict = "deepfake";
+  else if (pct >= 60) verdict = "likely_deepfake";
+  else if (pct >= 40) verdict = "uncertain";
+  else if (pct >= 20) verdict = "likely_authentic";
+  else verdict = "authentic";
 
   const visualPct = avgFake * 100;
   const audioPct = audio ? audio.fakeProbability * 100 : null;

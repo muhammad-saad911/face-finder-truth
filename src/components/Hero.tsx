@@ -1,9 +1,12 @@
 import { ArrowDown, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import heroPixel from "@/assets/hero-pixel-face.jpg";
 import heroEyes from "@/assets/hero-eyes.jpg";
 
 const navLinks = [
   { href: "#detect", label: "Detect" },
+  { href: "/history", label: "History" },
   { href: "#about", label: "About" },
   { href: "#method", label: "Method" },
   { href: "#gallery", label: "Gallery" },
@@ -20,11 +23,30 @@ export function Hero() {
         </div>
         <div className="hidden md:flex items-center gap-10 text-sm text-foreground/70">
           {navLinks.map((l) => (
-            <a key={l.href} href={l.href} className="hover:text-foreground transition-colors">{l.label}</a>
+            l.href.startsWith("#") ? (
+              <a key={l.href} href={l.href} className="hover:text-foreground transition-colors">
+                {l.label}
+              </a>
+            ) : (
+              <Link key={l.href} to={l.href} className="hover:text-foreground transition-colors">
+                {l.label}
+              </Link>
+            )
           ))}
         </div>
-        <div className="px-4 py-1.5 rounded-full border border-border text-xs font-mono-mini tracking-widest text-foreground/80">
-          555-VERIFY
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-1.5 rounded-full border border-border text-xs font-mono-mini tracking-widest text-foreground/80 hidden sm:block">
+            555-VERIFY
+          </div>
+          <Button asChild variant="ghost" className="hidden sm:inline-flex">
+            <Link to="/history">History</Link>
+          </Button>
+          <Button asChild variant="ghost" className="hidden sm:inline-flex">
+            <Link to="/login">Sign in</Link>
+          </Button>
+          <Button asChild className="bg-primary/90 hover:bg-primary text-primary-foreground border-0">
+            <Link to="/signup">Sign up</Link>
+          </Button>
         </div>
       </nav>
 
