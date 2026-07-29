@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, Image as ImageIcon, Film, X, Loader2, ShieldCheck, Sparkles, ShieldAlert, ShieldQuestion, AlertTriangle, LogOut, UserCircle2, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -254,6 +254,40 @@ const Index = () => {
   const meta = result ? verdictMeta[result.verdict] : null;
   const toneText = meta?.tone === "success" ? "text-success" : meta?.tone === "warning" ? "text-warning" : "text-danger";
   const toneBar = meta?.tone === "success" ? "bg-success" : meta?.tone === "warning" ? "bg-warning" : "bg-danger";
+  const videoModelCards = result?.mediaType === "video"
+    ? [
+        {
+          label: "Model 1",
+          name: "EfficientNet-B2",
+          prediction: result.model1_prediction,
+          confidence: result.model1_confidence,
+          fakeProbability: result.model1_fake_probability,
+          realProbability: result.model1_real_probability,
+          frames: typeof result.model1_fake_frames === "number" && typeof result.model1_real_frames === "number"
+            ? `${result.model1_fake_frames} fake / ${result.model1_real_frames} real frames`
+            : undefined,
+        },
+        {
+          label: "Model 2",
+          name: "ViT",
+          prediction: result.model2_prediction,
+          confidence: result.model2_confidence,
+          fakeProbability: result.model2_fake_probability,
+          realProbability: result.model2_real_probability,
+          frames: typeof result.model2_fake_frames === "number" && typeof result.model2_real_frames === "number"
+            ? `${result.model2_fake_frames} fake / ${result.model2_real_frames} real frames`
+            : undefined,
+        },
+        {
+          label: "Model 3",
+          name: "VideoMAE",
+          prediction: result.model3_prediction,
+          confidence: result.model3_confidence,
+          fakeProbability: result.model3_fake_probability,
+          realProbability: result.model3_real_probability,
+        },
+      ].filter((card) => typeof card.prediction !== "undefined" || typeof card.confidence === "number")
+    : [];
 
   return (
     <main className="min-h-screen [&_section]:scroll-mt-20 [&>div]:scroll-mt-20">
@@ -262,12 +296,12 @@ const Index = () => {
       <div id="detect" className="max-w-7xl mx-auto px-6 md:px-10 py-16 md:py-24 space-y-10">
         {/* Header */}
         <header className="space-y-3 max-w-3xl">
-          <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// 01 — Forensic media analysis</div>
+          <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// 01 â€” Forensic media analysis</div>
           <h2 className="text-5xl md:text-6xl font-serif italic leading-[1.05]">
             Run a real forensic scan.
           </h2>
           <p className="text-base text-muted-foreground max-w-xl leading-relaxed">
-            Upload an image or short video. Analysis runs through a multimodal AI pipeline — typically under 5 seconds.
+            Upload an image or short video. Analysis runs through a multimodal AI pipeline â€” typically under 5 seconds.
           </p>
         </header>
 
@@ -371,10 +405,10 @@ const Index = () => {
                   {tab === "image" ? "Drop an image here" : "Drop a video here"}
                 </p>
                 <p className="text-sm text-muted-foreground mb-5">
-                  or click to browse · max {maxMb} MB
+                  or click to browse Â· max {maxMb} MB
                 </p>
                 <div className="font-mono-mini text-[11px] tracking-widest text-muted-foreground uppercase">
-                  {tab === "image" ? "JPG · PNG · WEBP" : "ALL VIDEO FORMATS"}
+                  {tab === "image" ? "JPG Â· PNG Â· WEBP" : "ALL VIDEO FORMATS"}
                 </div>
               </div>
             ) : (
@@ -437,7 +471,7 @@ const Index = () => {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <p className="text-sm text-muted-foreground max-w-[220px]">
-                  {isWorking ? "Scanning media for synthetic artifacts…" : "Awaiting media. Drop a file to begin scanning."}
+                  {isWorking ? "Scanning media for synthetic artifactsâ€¦" : "Awaiting media. Drop a file to begin scanning."}
                 </p>
               </div>
             ) : (
@@ -480,6 +514,43 @@ const Index = () => {
                       </div>
                     </div>
                   )}
+
+                  {result.mediaType === "video" && videoModelCards.length > 0 && (
+                    <div className="space-y-3 rounded-2xl border border-border/60 bg-background/30 p-4">
+                      <div className="font-mono-mini text-[11px] uppercase tracking-widest text-muted-foreground">
+                        // Model Breakdown
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {videoModelCards.map((card) => (
+                          <div key={card.name} className="rounded-xl border border-border bg-background/60 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold">{card.label}</span>
+                              <span className="text-[11px] text-muted-foreground">{card.name}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Prediction</span>
+                              <span className={card.prediction === "FAKE" ? "text-danger font-medium" : "text-success font-medium"}>
+                                {card.prediction ?? "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Fake prob</span>
+                              <span>{typeof card.fakeProbability === "number" ? `${card.fakeProbability.toFixed(0)}%` : "N/A"}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Real prob</span>
+                              <span>{typeof card.realProbability === "number" ? `${card.realProbability.toFixed(0)}%` : "N/A"}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Confidence</span>
+                              <span>{typeof card.confidence === "number" ? `${card.confidence.toFixed(0)}%` : "N/A"}</span>
+                            </div>
+                            {card.frames && <div className="pt-1 text-[11px] text-muted-foreground">{card.frames}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t border-border">
@@ -503,7 +574,7 @@ const Index = () => {
         {currentUser ? <HistoryPanel items={history} loading={historyLoading} /> : null}
 
         <footer className="font-mono-mini text-[11px] text-muted-foreground tracking-widest uppercase pt-4">
-          // No sign-in required to analyze · sign in only to save scans · AI detection is probabilistic
+          // No sign-in required to analyze Â· sign in only to save scans Â· AI detection is probabilistic
         </footer>
       </div>
 
@@ -515,4 +586,5 @@ const Index = () => {
 };
 
 export default Index;
+
 

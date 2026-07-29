@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "@/components/ResultCard";
+﻿import { AnalysisResult } from "@/components/ResultCard";
 
 export type BackendMediaType = "image" | "video";
 
@@ -9,6 +9,22 @@ export type BackendAnalysisResponse = AnalysisResult & {
   model: string;
   mediaType: BackendMediaType;
   framesAnalyzed: number;
+  model1_prediction?: string;
+  model1_confidence?: number;
+  model1_fake_probability?: number;
+  model1_real_probability?: number;
+  model1_fake_frames?: number;
+  model1_real_frames?: number;
+  model2_prediction?: string;
+  model2_confidence?: number;
+  model2_fake_probability?: number;
+  model2_real_probability?: number;
+  model2_fake_frames?: number;
+  model2_real_frames?: number;
+  model3_prediction?: string;
+  model3_confidence?: number;
+  model3_fake_probability?: number;
+  model3_real_probability?: number;
 };
 
 function clampPercent(value: number) {
@@ -108,6 +124,23 @@ function parseVideoResponse(data: unknown): BackendAnalysisResponse {
   const realFrames = typeof payload.real_frames === "number" ? payload.real_frames : NaN;
   const model = typeof payload.model === "string" ? payload.model : "faceforge-detector";
 
+  const model1Prediction = payload.model1_prediction === "FAKE" || payload.model1_prediction === "REAL" ? payload.model1_prediction : undefined;
+  const model1Confidence = typeof payload.model1_confidence === "number" ? payload.model1_confidence : undefined;
+  const model1FakeProbability = typeof payload.model1_fake_probability === "number" ? payload.model1_fake_probability * 100 : undefined;
+  const model1RealProbability = typeof payload.model1_real_probability === "number" ? payload.model1_real_probability * 100 : undefined;
+  const model1FakeFrames = typeof payload.model1_fake_frames === "number" ? payload.model1_fake_frames : undefined;
+  const model1RealFrames = typeof payload.model1_real_frames === "number" ? payload.model1_real_frames : undefined;
+  const model2Prediction = payload.model2_prediction === "FAKE" || payload.model2_prediction === "REAL" ? payload.model2_prediction : undefined;
+  const model2Confidence = typeof payload.model2_confidence === "number" ? payload.model2_confidence : undefined;
+  const model2FakeProbability = typeof payload.model2_fake_probability === "number" ? payload.model2_fake_probability * 100 : undefined;
+  const model2RealProbability = typeof payload.model2_real_probability === "number" ? payload.model2_real_probability * 100 : undefined;
+  const model2FakeFrames = typeof payload.model2_fake_frames === "number" ? payload.model2_fake_frames : undefined;
+  const model2RealFrames = typeof payload.model2_real_frames === "number" ? payload.model2_real_frames : undefined;
+  const model3Prediction = payload.model3_prediction === "FAKE" || payload.model3_prediction === "REAL" ? payload.model3_prediction : undefined;
+  const model3Confidence = typeof payload.model3_confidence === "number" ? payload.model3_confidence : undefined;
+  const model3FakeProbability = typeof payload.model3_fake_probability === "number" ? payload.model3_fake_probability * 100 : undefined;
+  const model3RealProbability = typeof payload.model3_real_probability === "number" ? payload.model3_real_probability * 100 : undefined;
+
   if (
     !prediction ||
     !Number.isFinite(confidence) ||
@@ -118,10 +151,36 @@ function parseVideoResponse(data: unknown): BackendAnalysisResponse {
     throw new Error("Backend returned an incomplete video response");
   }
 
+  const backendFakeProbability = typeof payload.fake_probability === "number" ? payload.fake_probability : NaN;
+  const backendRealProbability = typeof payload.real_probability === "number" ? payload.real_probability : NaN;
+
   const total = framesAnalyzed > 0 ? framesAnalyzed : fakeFrames + realFrames;
-  const deepfakeProbability = total > 0 ? (fakeFrames / total) * 100 : prediction === "FAKE" ? 100 : 0;
-  return buildResult("video", deepfakeProbability, confidence, framesAnalyzed, model);
-}
+  const deepfakeProbability = Number.isFinite(backendFakeProbability)
+    ? (backendFakeProbability <= 1 ? backendFakeProbability * 100 : backendFakeProbability)
+    : total > 0
+      ? (fakeFrames / total) * 100
+      : prediction === "FAKE"
+        ? 100
+        : 0;
+  return {
+    ...buildResult("video", deepfakeProbability, confidence, framesAnalyzed, model),
+    model1_prediction: model1Prediction,
+    model1_confidence: model1Confidence,
+    model1_fake_probability: model1FakeProbability,
+    model1_real_probability: model1RealProbability,
+    model1_fake_frames: model1FakeFrames,
+    model1_real_frames: model1RealFrames,
+    model2_prediction: model2Prediction,
+    model2_confidence: model2Confidence,
+    model2_fake_probability: model2FakeProbability,
+    model2_real_probability: model2RealProbability,
+    model2_fake_frames: model2FakeFrames,
+    model2_real_frames: model2RealFrames,
+    model3_prediction: model3Prediction,
+    model3_confidence: model3Confidence,
+    model3_fake_probability: model3FakeProbability,
+    model3_real_probability: model3RealProbability,
+  };}
 
 export async function analyzeWithBackend(body: {
   file: File;
@@ -149,3 +208,5 @@ export async function analyzeWithBackend(body: {
 
   return body.mediaType === "image" ? parseImageResponse(data) : parseVideoResponse(data);
 }
+
+

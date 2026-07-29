@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldAlert, ShieldQuestion, AlertTriangle, type LucideIcon } from "lucide-react";
+﻿import { ShieldCheck, ShieldAlert, ShieldQuestion, AlertTriangle, type LucideIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 
@@ -12,6 +12,22 @@ export interface AnalysisResult {
   observations: string[];
   ai_probability?: number;
   real_probability?: number;
+  model1_prediction?: string;
+  model1_confidence?: number;
+  model1_fake_probability?: number;
+  model1_real_probability?: number;
+  model1_fake_frames?: number;
+  model1_real_frames?: number;
+  model2_prediction?: string;
+  model2_confidence?: number;
+  model2_fake_probability?: number;
+  model2_real_probability?: number;
+  model2_fake_frames?: number;
+  model2_real_frames?: number;
+  model3_prediction?: string;
+  model3_confidence?: number;
+  model3_fake_probability?: number;
+  model3_real_probability?: number;
 }
 
 const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" | "danger"; Icon: LucideIcon }> = {
@@ -101,7 +117,7 @@ export function ResultCard({ result, previewUrl, mediaType }: { result: Analysis
         <ul className="space-y-2">
           {result.observations.map((o, i) => (
             <li key={i} className="flex gap-3 text-sm text-foreground/85">
-              <span className="text-primary mt-1">▸</span>
+              <span className="text-primary mt-1">â–¸</span>
               <span>{o}</span>
             </li>
           ))}
@@ -109,7 +125,7 @@ export function ResultCard({ result, previewUrl, mediaType }: { result: Analysis
       </div>
 
       <p className="text-xs text-muted-foreground border-t border-border pt-4">
-        ⚠️ AI-based detection is probabilistic and not infallible. Use results as guidance, not absolute proof.
+        âš ï¸ AI-based detection is probabilistic and not infallible. Use results as guidance, not absolute proof.
       </p>
     </Card>
   );
