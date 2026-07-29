@@ -1,24 +1,49 @@
-import { useCallback, useRef, useState } from "react";
-import { Upload, Image as ImageIcon, Film, X, Loader2, ShieldCheck, Sparkles, ShieldAlert, ShieldQuestion, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Upload, Image as ImageIcon, Film, X, Loader2, ShieldCheck, Sparkles, ShieldAlert, ShieldQuestion, AlertTriangle, LogOut, UserCircle2, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { compressImage, extractVideoFrames, fileToDataUrl } from "@/lib/media";
 import { AnalysisResult, Verdict } from "@/components/ResultCard";
-import { aggregate, classifyImage, classifyImageTTA, loadDetector, type LoadProgress } from "@/lib/deepfakeDetector";
-import { classifyAudio, extractAudioPcm, loadAudioDetector } from "@/lib/audioDeepfakeDetector";
-import { cropFace, cropFacesMultiScale, loadFaceDetector } from "@/lib/faceDetector";
 import { Hero } from "@/components/Hero";
 import { Method } from "@/components/Method";
 import { Methods } from "@/components/Methods";
 import { Gallery } from "@/components/Gallery";
+import { analyzeWithBackend, type BackendAnalysisResponse } from "@/lib/backendDetector";
+import { AuthPanel } from "@/components/AuthPanel";
+import { HistoryPanel } from "@/components/HistoryPanel";
+import { loadUserAnalyses, saveAnalysisForUser, type SavedAnalysis } from "@/lib/analysisHistory";
+import { clearStoredAuth, getStoredAuth, login, me, register, type BackendUser } from "@/lib/backendSession";
 
 const MAX_IMAGE_MB = 15;
 const MAX_VIDEO_MB = 100;
 const ACCEPTED_IMAGE = ["image/jpeg", "image/png", "image/webp"];
-const ACCEPTED_VIDEO = ["video/mp4", "video/quicktime", "video/webm"];
+const ACCEPTED_VIDEO_PREFIX = "video/";
+const ACCEPTED_VIDEO_EXTENSIONS = [
+  ".3gp",
+  ".avi",
+  ".flv",
+  ".m4v",
+  ".mkv",
+  ".mov",
+  ".mp4",
+  ".mpeg",
+  ".mpg",
+  ".ts",
+  ".webm",
+  ".wmv",
+];
 
-const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" | "danger"; Icon: any }> = {
+type EnrichedAnalysisResult = AnalysisResult & {
+  backend?: string;
+  model?: string;
+  mediaType?: "image" | "video";
+  frameCount?: number;
+  framesAnalyzed?: number;
+  ai_probability?: number;
+  real_probability?: number;
+};
+
+const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" | "danger"; Icon: LucideIcon }> = {
   authentic: { label: "Authentic", tone: "success", Icon: ShieldCheck },
   likely_authentic: { label: "Likely Authentic", tone: "success", Icon: ShieldCheck },
   uncertain: { label: "Uncertain", tone: "warning", Icon: ShieldQuestion },
@@ -27,23 +52,124 @@ const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" 
 };
 
 const Index = () => {
+  const [currentUser, setCurrentUser] = useState<BackendUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<"sign_in" | "sign_up">("sign_in");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [history, setHistory] = useState<SavedAnalysis[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [tab, setTab] = useState<"image" | "video">("image");
-  const [status, setStatus] = useState<"idle" | "loading-model" | "preparing" | "analyzing">("idle");
-  const [modelProgress, setModelProgress] = useState<number>(0);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [status, setStatus] = useState<"idle" | "preparing" | "analyzing">("idle");
+  const [result, setResult] = useState<EnrichedAnalysisResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const mediaType = tab;
-  const accepted = tab === "image" ? ACCEPTED_IMAGE : ACCEPTED_VIDEO;
+  const accepted = tab === "image" ? ACCEPTED_IMAGE : ACCEPTED_VIDEO_EXTENSIONS;
   const maxMb = tab === "image" ? MAX_IMAGE_MB : MAX_VIDEO_MB;
+  const activeUserId = currentUser?.id;
+
+  useEffect(() => {
+    const stored = getStoredAuth();
+    if (!stored?.token) {
+      setAuthReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    me(stored.token)
+      .then((user) => {
+        if (!cancelled) setCurrentUser(user);
+      })
+      .catch((error) => {
+        console.warn("Stored login expired or invalid:", error);
+        clearStoredAuth();
+        if (!cancelled) setCurrentUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setHistory([]);
+      return;
+    }
+
+    let cancelled = false;
+    setHistoryLoading(true);
+    loadUserAnalyses(10)
+      .then((items) => {
+        if (!cancelled) setHistory(items);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) toast.error("Could not load your scan history");
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeUserId]);
+
+  const handleAuthSubmit = async () => {
+    const email = authEmail.trim();
+    if (!email || !authPassword.trim()) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const auth = authMode === "sign_in" ? await login(email, authPassword) : await register(email, authPassword);
+      setCurrentUser(auth.user);
+      toast.success(authMode === "sign_in" ? "Signed in successfully" : "Account created");
+      setAuthPassword("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed";
+      setAuthError(message);
+      toast.error("Authentication failed", { description: message });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    clearStoredAuth();
+    setCurrentUser(null);
+    setHistory([]);
+    setResult(null);
+    toast.success("Signed out");
+  };
 
   const handleFile = useCallback((f: File) => {
-    const ok = accepted.includes(f.type);
+    const fileName = f.name.toLowerCase();
+    const ok =
+      tab === "image"
+        ? accepted.includes(f.type)
+        : f.type.startsWith(ACCEPTED_VIDEO_PREFIX) ||
+          ACCEPTED_VIDEO_EXTENSIONS.some((ext) => fileName.endsWith(ext));
     if (!ok) {
-      toast.error("Unsupported file type", { description: tab === "image" ? "Use JPG, PNG, or WEBP." : "Use MP4, MOV, or WEBM." });
+      toast.error("Unsupported file type", {
+        description:
+          tab === "image"
+            ? "Use JPG, PNG, or WEBP."
+            : "Use any common video format such as MP4, MOV, WEBM, MKV, AVI, or M4V.",
+      });
       return;
     }
     if (f.size > maxMb * 1024 * 1024) {
@@ -80,81 +206,42 @@ const Index = () => {
     if (!file) return;
     setResult(null);
     try {
-      // 1) Make sure the in-browser model is loaded
-      setStatus("loading-model");
-      setModelProgress(0);
-      await loadDetector((p) => {
-        if (p.status === "progress" && typeof p.progress === "number") {
-          setModelProgress(Math.round(p.progress));
-        }
-      });
-
-      // 2) Prepare frames
       setStatus("preparing");
-      let images: string[];
-      let useTTA = false;
-      if (mediaType === "image") {
-        const dataUrl = await fileToDataUrl(file);
-        // NOTE: do NOT re-compress the source — JPEG re-encoding destroys the
-        // exact compression artifacts the deepfake detector relies on.
-        // For still images: detect ALL faces and emit multi-scale crops
-        // (tight/medium/wide pad) per face + sliding-window tiles for context.
-        // Each crop is then run through TTA for max accuracy on partial edits.
-        try {
-          await loadFaceDetector();
-          images = await cropFacesMultiScale(dataUrl, [0.15, 0.4, 0.8], 384, 3);
-        } catch (e) {
-          console.warn("Multi-scale crop skipped:", e);
-          images = [dataUrl];
-        }
-        useTTA = true;
-
-      } else {
-        toast.info("Extracting video frames...");
-        images = await extractVideoFrames(file, 15, 1024);
-        // 2b) Face-crop each video frame (single largest face, no TTA — speed)
-        try {
-          await loadFaceDetector();
-          const cropped: string[] = [];
-          for (const img of images) {
-            cropped.push(await cropFace(img));
-          }
-          images = cropped;
-        } catch (e) {
-          console.warn("Face cropping skipped:", e);
-        }
-      }
-
-      // 3) Run the ONNX detector on every frame/face, locally
       setStatus("analyzing");
-      const scores = [];
-      for (const img of images) {
-        scores.push(useTTA ? await classifyImageTTA(img) : await classifyImage(img));
-      }
+      const backendResult = (await analyzeWithBackend({
+        file,
+        mediaType,
+      })) as BackendAnalysisResponse;
 
+      const finalResult: EnrichedAnalysisResult = {
+        ...backendResult,
+        mediaType,
+        frameCount: backendResult.framesAnalyzed,
+      };
 
-      // 4) For videos, also run the audio deepfake detector if there's an audio track
-      let audioVerdict = null;
-      if (mediaType === "video") {
+      setResult(finalResult);
+
+      if (currentUser) {
         try {
-          const pcm = await extractAudioPcm(file);
-          if (pcm && pcm.length > 16000 * 0.5) {
-            toast.info("Analyzing audio track...");
-            await loadAudioDetector((p) => {
-              if (p.status === "progress" && typeof p.progress === "number") {
-                setModelProgress(Math.round(p.progress));
-              }
-            });
-            audioVerdict = await classifyAudio(pcm);
-          }
-        } catch (e) {
-          console.warn("Audio analysis skipped:", e);
+          const saved = await saveAnalysisForUser({
+            fileName: file.name,
+            mediaType,
+            frameCount: finalResult.frameCount ?? finalResult.framesAnalyzed ?? 1,
+            result: finalResult,
+          });
+          setHistory((prev) => [saved, ...prev].slice(0, 10));
+          toast.success("Scan complete", {
+            description: "Your result was saved to your account.",
+          });
+        } catch (saveError) {
+          console.warn("Could not save analysis history:", saveError);
+          toast.warning("Scan completed, but the result could not be saved to your account.");
         }
+      } else {
+        toast.success("Scan complete", {
+          description: "Sign in anytime if you want to save your scan history.",
+        });
       }
-
-      const result = aggregate(scores, audioVerdict, mediaType === "image" ? "topk" : "mean");
-      setResult(result as AnalysisResult);
-      toast.success("Scan complete");
     } catch (e) {
       console.error(e);
       toast.error("Analysis failed", { description: e instanceof Error ? e.message : "Unknown error" });
@@ -183,6 +270,62 @@ const Index = () => {
             Upload an image or short video. Analysis runs through a multimodal AI pipeline — typically under 5 seconds.
           </p>
         </header>
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          {!authReady ? (
+            <Card className="card-glass p-6 md:p-8">
+              <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">Loading account...</div>
+            </Card>
+          ) : currentUser ? (
+            <Card className="card-glass p-6 md:p-8 space-y-5">
+              <div className="space-y-2">
+                <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// Account</div>
+                <h3 className="text-2xl md:text-3xl font-serif italic leading-tight">Welcome back</h3>
+                <p className="text-sm text-muted-foreground break-all">{currentUser.email}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border px-3 py-1">Saved scans: {history.length}</span>
+                <span className="rounded-full border border-border px-3 py-1">Private history</span>
+                <span className="rounded-full border border-border px-3 py-1">Per-user data</span>
+              </div>
+              <Button variant="outline" onClick={handleSignOut} className="w-full">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </Button>
+            </Card>
+          ) : (
+            <AuthPanel
+              mode={authMode}
+              email={authEmail}
+              password={authPassword}
+              busy={authBusy}
+              error={authError}
+              onModeChange={setAuthMode}
+              onEmailChange={setAuthEmail}
+              onPasswordChange={setAuthPassword}
+              onSubmit={handleAuthSubmit}
+            />
+          )}
+
+          <Card className="card-glass p-6 md:p-8 space-y-5">
+            <div className="space-y-2">
+              <div className="font-mono-mini text-xs text-primary/70 tracking-widest uppercase">// Data</div>
+              <h3 className="text-2xl md:text-3xl font-serif italic leading-tight">Your scans can stay with your account</h3>
+              <p className="text-sm text-muted-foreground">
+                No sign-in is required to analyze. Sign in only if you want private saved history.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-4">
+              <UserCircle2 className="w-10 h-10 text-primary" />
+              <div>
+                <p className="font-medium">{currentUser ? "Analysis saving enabled" : "Sign in to enable saved scans"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {currentUser ? "Your results will appear in the history panel below." : "Login gives you personal scan history and saved verdicts."}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* Two-panel layout */}
         <div className="grid lg:grid-cols-2 gap-6">
@@ -218,7 +361,7 @@ const Index = () => {
                   ref={inputRef}
                   type="file"
                   className="hidden"
-                  accept={accepted.join(",")}
+                  accept={tab === "image" ? accepted.join(",") : "video/*"}
                   onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                 />
                 <div className="mx-auto w-14 h-14 rounded-md border border-primary/40 bg-primary/5 flex items-center justify-center mb-5">
@@ -231,7 +374,7 @@ const Index = () => {
                   or click to browse · max {maxMb} MB
                 </p>
                 <div className="font-mono-mini text-[11px] tracking-widest text-muted-foreground uppercase">
-                  {tab === "image" ? "JPG · PNG · WEBP" : "MP4 · MOV · WEBM"}
+                  {tab === "image" ? "JPG · PNG · WEBP" : "ALL VIDEO FORMATS"}
                 </div>
               </div>
             ) : (
@@ -272,10 +415,8 @@ const Index = () => {
             >
               {isWorking ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {status === "loading-model"
-                    ? `Loading detector${modelProgress ? ` ${modelProgress}%` : "…"}`
-                    : status === "preparing"
-                    ? (mediaType === "video" ? "Extracting frames..." : "Preparing...")
+                  {status === "preparing"
+                    ? "Preparing upload..."
                     : "Analyzing..."}
                 </>
               ) : (
@@ -328,6 +469,17 @@ const Index = () => {
                       <div className="h-full bg-foreground/60 transition-all duration-700" style={{ width: `${result.confidence}%` }} />
                     </div>
                   </div>
+                  {typeof result.ai_probability === "number" && (
+                    <div>
+                      <div className="flex justify-between text-xs font-mono-mini uppercase tracking-wider text-muted-foreground mb-2">
+                        <span>AI-generated signal</span>
+                        <span>{result.ai_probability.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full bg-primary/80 transition-all duration-700" style={{ width: `${result.ai_probability}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t border-border">
@@ -348,8 +500,10 @@ const Index = () => {
           </Card>
         </div>
 
+        {currentUser ? <HistoryPanel items={history} loading={historyLoading} /> : null}
+
         <footer className="font-mono-mini text-[11px] text-muted-foreground tracking-widest uppercase pt-4">
-          // Files processed in-memory · Never stored · AI detection is probabilistic
+          // No sign-in required to analyze · sign in only to save scans · AI detection is probabilistic
         </footer>
       </div>
 
@@ -361,3 +515,4 @@ const Index = () => {
 };
 
 export default Index;
+

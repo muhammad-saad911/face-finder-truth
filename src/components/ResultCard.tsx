@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldAlert, ShieldQuestion, AlertTriangle } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldQuestion, AlertTriangle, type LucideIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 
@@ -10,9 +10,11 @@ export interface AnalysisResult {
   confidence: number;
   summary: string;
   observations: string[];
+  ai_probability?: number;
+  real_probability?: number;
 }
 
-const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" | "danger"; Icon: any }> = {
+const verdictMeta: Record<Verdict, { label: string; tone: "success" | "warning" | "danger"; Icon: LucideIcon }> = {
   authentic: { label: "Authentic", tone: "success", Icon: ShieldCheck },
   likely_authentic: { label: "Likely Authentic", tone: "success", Icon: ShieldCheck },
   uncertain: { label: "Uncertain", tone: "warning", Icon: ShieldQuestion },
@@ -53,26 +55,45 @@ export function ResultCard({ result, previewUrl, mediaType }: { result: Analysis
 
           <p className="text-lg text-foreground/90 leading-relaxed">{result.summary}</p>
 
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-muted-foreground">Deepfake probability</span>
-                <span className="font-mono font-semibold">{result.deepfake_probability.toFixed(0)}%</span>
+      <div className="space-y-3">
+        <div>
+          <div className="flex justify-between text-sm mb-1.5">
+            <span className="text-muted-foreground">Deepfake probability</span>
+            <span className="font-mono font-semibold">{result.deepfake_probability.toFixed(0)}%</span>
               </div>
               <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
                 <div className={`h-full ${barClass} transition-all duration-700`} style={{ width: `${result.deepfake_probability}%` }} />
               </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-muted-foreground">Model confidence</span>
-                <span className="font-mono font-semibold">{result.confidence.toFixed(0)}%</span>
-              </div>
-              <Progress value={result.confidence} className="h-2.5" />
+          <div>
+            <div className="flex justify-between text-sm mb-1.5">
+              <span className="text-muted-foreground">Model confidence</span>
+              <span className="font-mono font-semibold">{result.confidence.toFixed(0)}%</span>
             </div>
+            <Progress value={result.confidence} className="h-2.5" />
           </div>
+
+          {typeof result.ai_probability === "number" && typeof result.real_probability === "number" && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">AI-generated</span>
+                  <span className="font-mono font-semibold">{result.ai_probability.toFixed(0)}%</span>
+                </div>
+                <Progress value={result.ai_probability} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Real content</span>
+                  <span className="font-mono font-semibold">{result.real_probability.toFixed(0)}%</span>
+                </div>
+                <Progress value={result.real_probability} className="h-2" />
+              </div>
+            </div>
+          )}
         </div>
+      </div>
       </div>
 
       <div className="border-t border-border pt-5">
